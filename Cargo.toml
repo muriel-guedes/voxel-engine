@@ -1,0 +1,12 @@
+[package]
+name = "voxel-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cgmath = "0.18.0"
+env_logger = "0.10.0"
+lazy_static = "1.4.0"
+pixels = "0.12.1"
+winit = "0.28.3"
+bitvec = { git = "https://github.com/muriel-guedes/bitvec" }
