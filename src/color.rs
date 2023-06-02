@@ -6,18 +6,6 @@ const RED_MAX: ColorType = max_value::<RED_BITS>();
 const GREEN_MAX: ColorType = max_value::<GREEN_BITS>();
 const BLUE_MAX: ColorType = max_value::<BLUE_BITS>();
 
-lazy_static::lazy_static! {
-    pub static ref WHITE:   Color = (1., 1., 1.).into();
-    pub static ref BLACK:   Color = (0., 0., 0.).into();
-    pub static ref RED:     Color = (1., 0., 0.).into();
-    pub static ref GREEN:   Color = (0., 1., 0.).into();
-    pub static ref BLUE:    Color = (0., 0., 1.).into();
-    pub static ref YELLOW:  Color = (1., 1., 0.).into();
-    pub static ref CYAN:    Color = (0., 1., 1.).into();
-    pub static ref MAGENTA: Color = (1., 0., 1.).into();
-    pub static ref GRAY:    Color = (0.5, 0.5, 0.5).into();
-}
-
 #[derive(Copy, Clone)]
 pub struct Color(pub ColorType);
 impl Color {

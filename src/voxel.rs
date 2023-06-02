@@ -1,7 +1,6 @@
-use cgmath::Vector3;
 use bitvec::BitVec;
 
-use crate::{Ray, Color};
+use crate::{Ray, Color, Vector};
 
 pub enum Intersection {
     Inside,
@@ -10,22 +9,23 @@ pub enum Intersection {
 }
 
 pub struct Voxel {
-    pub size: Vector3<i16>,
-    pub bounds: [Vector3<f32>;2],
+    pub size: [i16;3],
+    pub bounds: [Vector;2],
     pub data: BitVec<u32>,
     pub color: Color
 }
 impl Voxel {
     pub fn new(
-        center: Vector3<f32>,
-        size: [usize;3],
+        center: Vector,
+        size: [i16;3],
         color: Color
     ) -> Self {
+        assert!(size[0]>0 && size[1]>0 && size[2]>0, "All sides of the Voxel must bigger than 0");
         let mut data = BitVec::<u32>::new();
-        data.resize(size[0] * size[1] * size[2]);
-        let half_size = Vector3::new(size[0] as f32, size[1] as f32, size[2] as f32) / 2.;
+        data.resize((size[0] * size[1] * size[2])as usize);
+        let half_size = Vector::new(size[0] as f32, size[1] as f32, size[2] as f32) / 2.;
         Self {
-            size: Vector3::new(size[0] as i16, size[1] as i16, size[2] as i16),
+            size,
             bounds: [center-half_size, center+half_size],
             data,
             color: color.into()
@@ -69,54 +69,39 @@ impl Voxel {
     }
 
     pub fn get_bit(&self, x: i16, y: i16, z: i16) -> bool {
-        self.data.get((x + y * self.size.x + z * (self.size.x * self.size.y))as usize)
+        self.data.get((x + y * self.size[0] + z * (self.size[0] * self.size[1]))as usize)
     }
 
     pub fn walk(&self, ray: &Ray, t: f32) -> Option<Color> {
         let p = ray.at(t) - self.bounds[0];
-        let mut x = p.x.ceil().min(1.) as i16 - 1;
-        let mut y = p.y.ceil().min(1.) as i16 - 1;
-        let mut z = p.z.ceil().min(1.) as i16 - 1;
-        let mut ex = p.x - p.x.floor();
-        let mut ey = p.y - p.y.floor();
-        let mut ez = p.z - p.z.floor();
+        let dx = if ray.direction.x > 0. { 1 } else { -1 };
+        let dy = if ray.direction.y > 0. { 1 } else { -1 };
+        let dz = if ray.direction.z > 0. { 1 } else { -1 };
         loop {
-            if self.get_bit(x, y, z) { return Some(self.color) }
-            if ex < ey && ex < ez {
-                ex += ray.direction.x;
-                x = p.x.ceil().min(1.) as i16 - 1;
-                if x < 0 || x >= self.size.x { return None }
-            } else if ey < ez {
-                ey += ray.direction.y;
-                y = p.y.ceil().min(1.) as i16 - 1;
-                if y < 0 || y >= self.size.y { return None }
-            } else {
-                ez += ray.direction.z;
-                z = p.z.ceil().min(1.) as i16 - 1;
-                if z < 0 || z >= self.size.z { return None }
-            }
+            
         }
+        None
     }
 
     pub fn fill_with(&mut self, v: bool) {
-        for i in 0..(self.size.x * self.size.y * self.size.z)as usize {
+        for i in 0..(self.size[0] * self.size[1] * self.size[2])as usize {
             self.data.set(i, v)
         }
     }
     pub fn fill_rect(&mut self, from: [usize;3], to: [usize;3], v: bool) {
-        assert!(from[0]<to[0] && from[1]<to[1] && from[2]<to[2]);
-        let hw = (self.size.x * self.size.y)as usize;
+        assert!(from[0]<to[0] && from[1]<to[1] && from[2]<to[2], "'from' must be less than 'to'");
+        let hw = (self.size[0] * self.size[1])as usize;
         let mut y;
         let mut z;
         for x in from[0]..to[0] {
-            y = from[1] * self.size.x as usize;
+            y = from[1] * self.size[0] as usize;
             for _ in from[1]..to[1] {
                 z = from[2] * hw;
                 for _ in from[2]..to[2] {
                     self.data.set(x + y + z, v);
                     z += hw;
                 }
-                y += self.size.x as usize;
+                y += self.size[0] as usize;
             }
         }
     }

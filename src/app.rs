@@ -1,19 +1,18 @@
 use std::collections::HashSet;
-
-use cgmath::{Vector3, Deg, Quaternion, Rotation3, Rad, InnerSpace};
 use pixels::{SurfaceTexture, Pixels};
 use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder, Window}, dpi::PhysicalSize,
     event::{Event, WindowEvent, KeyboardInput, ElementState::{Pressed, Released}, VirtualKeyCode}};
 
-use crate::{Camera, Ray, Voxel, Intersection};
+use crate::{Camera, Ray, Voxel, Intersection, radians, Vector, Color};
 
 pub struct App {
     event_loop: Option<EventLoop<()>>,
-    window: Window,
+    pub window: Window,
     pixels: Pixels,
-    pressed_keys: HashSet<VirtualKeyCode>,
+    pub pressed_keys: HashSet<VirtualKeyCode>,
+    pub background: Color,
     pub camera: Camera,
-    voxels: Vec<Voxel>
+    pub voxels: Vec<Voxel>
 }
 
 impl App {
@@ -28,13 +27,13 @@ impl App {
         let pixels = Pixels::new(width, height, SurfaceTexture::new(width, height, &window)).unwrap();
         
         let camera = Camera {
-            position: [0., 0., 0.].into(),
-            rotation: [0., 0.].into(),
+            position: 0.0.into(),
+            rotation: [0.;2],
 
-            mov_speed: [1.;3].into(),
-            rot_speed: [0.1;2].into(),
+            mov_speed: 1.0.into(),
+            rot_speed: [0.1;2],
 
-            fov: Deg(45.).into()
+            fov: radians(45.)
         };
         
         Self {
@@ -42,17 +41,10 @@ impl App {
             window,
             pixels,
             pressed_keys: Default::default(),
+            background: (0, 0, 0).into(),
             camera,
             voxels: Vec::new()
         }
-    }
-    pub fn set_camera_pos(mut self, position: impl Into<Vector3<f32>>) -> Self {
-        self.camera.position = position.into();
-        self
-    }
-    pub fn add_voxel(mut self, voxel: Voxel) -> Self {
-        self.voxels.push(voxel);
-        self
     }
     pub fn start(mut self) {
         self.event_loop.take().unwrap().run(move |event, _, control_flow| {
@@ -86,16 +78,16 @@ impl App {
     pub fn render(&mut self) {
         for key in self.pressed_keys.iter() {
             match key {
-                VirtualKeyCode::W => self.camera.position.z -= self.camera.mov_speed.z,
-                VirtualKeyCode::S => self.camera.position.z += self.camera.mov_speed.z,
-                VirtualKeyCode::A => self.camera.position.x -= self.camera.mov_speed.x,
-                VirtualKeyCode::D => self.camera.position.x += self.camera.mov_speed.x,
-                VirtualKeyCode::E => self.camera.position.y += self.camera.mov_speed.y,
-                VirtualKeyCode::Q => self.camera.position.y -= self.camera.mov_speed.y,
-                VirtualKeyCode::I => self.camera.rotation.x += self.camera.rot_speed.x,
-                VirtualKeyCode::K => self.camera.rotation.x -= self.camera.rot_speed.x,
-                VirtualKeyCode::L => self.camera.rotation.y -= self.camera.rot_speed.y,
-                VirtualKeyCode::J => self.camera.rotation.y += self.camera.rot_speed.y,
+                VirtualKeyCode::W => self.camera.move_forward(),
+                VirtualKeyCode::S => self.camera.move_backwards(),
+                VirtualKeyCode::A => self.camera.move_left(),
+                VirtualKeyCode::D => self.camera.move_right(),
+                VirtualKeyCode::E => self.camera.move_up(),
+                VirtualKeyCode::Q => self.camera.move_down(),
+                VirtualKeyCode::I => self.camera.rotation[0] -= self.camera.rot_speed[0],
+                VirtualKeyCode::K => self.camera.rotation[0] += self.camera.rot_speed[0],
+                VirtualKeyCode::L => self.camera.rotation[1] += self.camera.rot_speed[1],
+                VirtualKeyCode::J => self.camera.rotation[1] -= self.camera.rot_speed[1],
                 _ => {}
             }
         }
@@ -104,13 +96,9 @@ impl App {
         let frame = self.pixels.frame_mut();
 
         let aspect_ratio = window_size.width as f32 / window_size.height as f32;
-        let height = (self.camera.fov.0 / 2.).tan();
+        let height = (self.camera.fov / 2.).tan();
         let viewport_height = height * 2.;
         let viewport_width = viewport_height * aspect_ratio;
-
-        let rotation =
-            Quaternion::from_angle_y(Rad(self.camera.rotation.y)) *
-            Quaternion::from_angle_x(Rad(self.camera.rotation.x));
 
         let mut i = 0;
         for y in 0..window_size.height {
@@ -118,7 +106,10 @@ impl App {
                 let v = ((y as f32 + 0.5) / (window_size.height - 1) as f32) * 2. - 1.;
                 let h = ((x as f32 + 0.5) / (window_size.width - 1) as f32) * 2. - 1.;
 
-                let direction = rotation * Vector3::new(h * viewport_width, -v * viewport_height, -1.).normalize();
+                let direction = Vector::new(h * viewport_width, -v * viewport_height, -1.)
+                    .rotate_x(self.camera.rotation[0])
+                    .rotate_y(self.camera.rotation[1])
+                    .normalize();
                 let ray = Ray::new(self.camera.position, direction);
 
                 let mut min_dis = f32::MAX;
@@ -139,7 +130,7 @@ impl App {
                     }
                 }
 
-                let mut intr_color = *crate::BLACK;
+                let mut intr_color = self.background;
                 
                 if let Some(voxel) = intr_voxel {
                     if let Some(color) = voxel.walk(&ray, min_dis) {
